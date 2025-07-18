@@ -11,5 +11,5 @@ iwctl
 ```bash
 git clone https://github.com/Mystic-1247/arch1.git
 cd arch1
-chmod +x arch.sh
-./arch.sh
+chmod +x install.sh
+./install.sh
