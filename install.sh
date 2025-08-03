@@ -40,7 +40,7 @@ swapon "$SWAP"
 
 # ========= INSTALL BASE =========
 log "Installing base system..."
-pacstrap /mnt base linux linux-firmware sof-firmware base-devel nano networkmanager systemd-bootctl | tee -a "$LOGFILE"
+pacstrap /mnt base linux linux-firmware sof-firmware base-devel nano networkmanager | tee -a "$LOGFILE"
 
 log "Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -88,6 +88,12 @@ timeout 3
 console-mode max
 editor no
 EOL
+
+# === POST-INSTALL: GNOME Desktop ===
+echo "[+] Installing GNOME and enabling GDM..."
+pacman -Sy --noconfirm gnome gnome-tweaks
+systemctl enable gdm
+
 EOF
 
 chmod +x /mnt/root/second_stage.sh
@@ -102,13 +108,3 @@ rm /mnt/root/second_stage.sh
 umount -a
 log "Installation complete. Reboot to enter Arch."
 
-# === POST INSTALL CONFIG ===
-
-log() {
-    echo "[+] $1"
-}
-
-log "Installing GNOME and enabling GDM..."
-
-pacman -Sy --noconfirm gnome gnome-tweaks
-systemctl enable gdm
