@@ -1,29 +1,52 @@
 #!/bin/bash
-set -e
 
-# PARTITION DEVICES — edit as needed
+# ========= CONFIG =========
 EFI=/dev/sda1
 SWAP=/dev/sda2
 ROOT=/dev/sda3
+LOGFILE="/tmp/arch_install.log"
+set -o pipefail
 
-# Format
-mkfs.ext4 $ROOT
-mkfs.fat -F 32 $EFI
-mkswap $SWAP
+log() {
+    echo "[+] $1" | tee -a "$LOGFILE"
+}
+fail() {
+    echo "[!] ERROR: $1" | tee -a "$LOGFILE"
+    exit 1
+}
+trap 'fail "Script interrupted or failed."' ERR
 
-# Mount
-mount $ROOT /mnt
+# ========= PRE-CHECKS =========
+log "Checking internet..."
+ping -q -c 1 archlinux.org >/dev/null || fail "No internet connection."
+
+log "Verifying partitions exist..."
+for dev in "$EFI" "$SWAP" "$ROOT"; do
+    [ -b "$dev" ] || fail "Device $dev not found."
+done
+
+# ========= FORMAT =========
+log "Formatting partitions..."
+mkfs.ext4 -F "$ROOT" | tee -a "$LOGFILE"
+mkfs.fat -F 32 "$EFI" | tee -a "$LOGFILE"
+mkswap "$SWAP" | tee -a "$LOGFILE"
+
+# ========= MOUNT =========
+log "Mounting partitions..."
+mount "$ROOT" /mnt
 mkdir -p /mnt/boot
-mount $EFI /mnt/boot
-swapon $SWAP
+mount "$EFI" /mnt/boot
+swapon "$SWAP"
 
-# Base install
-pacstrap /mnt base linux linux-firmware sof-firmware base-devel nano networkmanager systemd-bootctl
+# ========= INSTALL BASE =========
+log "Installing base system..."
+pacstrap /mnt base linux linux-firmware sof-firmware base-devel nano networkmanager systemd-bootctl | tee -a "$LOGFILE"
 
-# Fstab
-genfstab -U /mnt > /mnt/etc/fstab
+log "Generating fstab..."
+genfstab -U /mnt >> /mnt/etc/fstab
 
-# Copy second-stage script
+# ========= SECOND STAGE =========
+log "Writing second stage setup..."
 cat > /mnt/root/second_stage.sh <<'EOF'
 #!/bin/bash
 set -e
@@ -33,22 +56,20 @@ hwclock --systohc
 
 sed -i '/en_US.UTF-8 UTF-8/s/^#//' /etc/locale.gen
 locale-gen
+
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 echo "KEYMAP=us" > /etc/vconsole.conf
-
 echo "Mystic" > /etc/hostname
 
-echo "Set root password:"
-passwd
-
+PASSWORD='My5T!c@#'
+echo "root:$PASSWORD" | chpasswd
 useradd -m -G wheel -s /bin/bash mystic
-echo "Set password for mystic:"
-passwd mystic
+echo "mystic:$PASSWORD" | chpasswd
 
-EDITOR=nano visudo  # you'll still need to uncomment wheel access
+
+sed -i '/%wheel ALL=(ALL:ALL) ALL/s/^# //' /etc/sudoers
 
 systemctl enable NetworkManager
-
 bootctl install
 
 PARTUUID=$(blkid -s PARTUUID -o value $(findmnt / -o SOURCE -n))
@@ -71,12 +92,12 @@ EOF
 
 chmod +x /mnt/root/second_stage.sh
 
-# Chroot and run second stage
+# ========= CHROOT =========
+log "Running second stage inside chroot..."
 arch-chroot /mnt /root/second_stage.sh
 
-# Clean up
+# ========= CLEANUP =========
+log "Cleaning up..."
 rm /mnt/root/second_stage.sh
-
-# Unmount
 umount -a
-echo "Installation done. Reboot now."
+log "Installation complete. Reboot to enter Arch."
