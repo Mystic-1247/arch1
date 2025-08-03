@@ -101,3 +101,14 @@ log "Cleaning up..."
 rm /mnt/root/second_stage.sh
 umount -a
 log "Installation complete. Reboot to enter Arch."
+
+# === POST INSTALL CONFIG ===
+
+log() {
+    echo "[+] $1"
+}
+
+log "Installing GNOME and enabling GDM..."
+
+pacman -Sy --noconfirm gnome gnome-tweaks
+systemctl enable gdm
