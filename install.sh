@@ -105,6 +105,6 @@ arch-chroot /mnt /root/second_stage.sh
 # ========= CLEANUP =========
 log "Cleaning up..."
 rm /mnt/root/second_stage.sh
-umount -a
+# umount -a
 log "Installation complete. Reboot to enter Arch."
 
